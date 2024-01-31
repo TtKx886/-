@@ -1,0 +1,136 @@
+mixed-port:  #混合代理模式
+geodata-mode: true
+tcp-concurrent: true
+allow-lan: true
+bind-address: '*'
+mode: rule
+log-level: error
+ipv6: false
+external-controller: 0.0.0.0:80
+external-ui: dist
+
+hosts:
+  'wifi.hot': 198.18.0.1
+
+tun:
+  enable: true
+  device: tunDev
+  stack: gvisor
+  dns-hijack:
+    - 'any:53'
+  auto-route: false
+  auto-detect-interface: false
+
+dns:
+  enable: true
+  #listen: 0.0.0.0:8053
+  enhanced-mode: redir-host
+  nameserver:
+    - 'https://1.12.12.12/dns-query#🐼电报频道:@Whitelist520' #后缀#🐼电报频道:@Whitelist520意为使用🐼电报频道:@Whitelist520节点代理
+    - 'https://223.5.5.5/dns-query#🐼电报频道:@Whitelist520'
+    - 'https://101.198.192.33/dns-query#🐼电报频道:@Whitelist520'
+  proxy-server-nameserver:  #当proxy里的server为域名时，使用该列表里的dns服务器解析
+    - 'https://1.12.12.12/dns-query#🐼电报频道:@Whitelist520'
+    - 'https://223.5.5.5/dns-query#🐼电报频道:@Whitelist520'
+    - 'https://101.198.192.33/dns-query#🐼电报频道:@Whitelist520'
+
+# 电报频道:@Whitelist520节点
+baidu: &baidu
+  type: http
+  port: 443
+  headers:
+    X-T5-Auth: "683556433"
+    Host: 153.3.236.22:443
+        
+           
+CF443: &CF443
+    type: vless
+    uuid: 8266d288-39ce-44ba-9c9c-9e62b28a44b8
+    udp: true
+    tls: true
+    network: ws
+    servername: ikun.almp.link # priority over wss host
+    # skip-cert-verify: true
+    ws-opts:
+      path: "/?ed=2048"
+      headers:
+        Host: ikun.almp.link     
+        
+        
+MF: &MF
+    type: vmess
+    uuid: 418048af-a293-4b99-9b0c-98ca3580dd24
+    alterId: 64
+    cipher: auto
+    udp: true
+    skip-cert-verify: true
+    network: tcp
+    ws-opts:
+      path: /
+      headers:
+         Host: v9-dy.ixigua.com
+                                  
+proxies:
+  - name: "电报频道:@Whitelist520：苏州"
+    server: 157.0.148.53
+    <<: *baidu
+  - name: "电报频道:@Whitelist520：保定"
+    server: 110.242.70.69
+    <<: *baidu
+  - name: "电报频道:@Whitelist520：广州"
+    server: 157.255.78.51
+    <<: *baidu
+  - name: "电报频道:@Whitelist520：南京"
+    server: 153.3.236.22
+    <<: *baidu
+  - name: "电报频道:@Whitelist520：域名"
+    server: cloudnproxy.baidu.com
+    <<: *baidu    
+
+    
+  - name: "Proxy"
+    server: ikun.almp.link
+    port: 443
+    <<: *CF443    
+    
+  - name: "Domestic"
+    server: 175.27.154.61
+    port: 50002
+    <<: *MF
+
+
+proxy-groups:
+  - name: 电报频道:@Whitelist520
+    type: select
+    proxies:  
+      - 电报频道:@Whitelist520：苏州
+      - 电报频道:@Whitelist520：保定          
+      - 电报频道:@Whitelist520：广州
+      - 电报频道:@Whitelist520：南京
+      - 电报频道:@Whitelist520：域名
+      - DIRECT
+                  
+  - name: 阿灵
+    type: relay 
+    proxies:
+      - 电报频道:@Whitelist520
+      - Domestic
+
+  - name: 分享
+    type: relay
+    proxies:
+      - 电报频道:@Whitelist520
+      - Proxy
+
+rules:
+  - GEOSITE,category-ads-all,REJECT     #广告拦截
+  - IP-CIDR,127.0.0.0/8,DIRECT          #指定IP范围放行
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  #- DST-PORT,9999,DIRECT                #指定目标端口范围放行
+  - AND,((GEOIP,cn),(NETWORK,UDP)),阿灵
+  - AND,((DST-PORT,22/446/30443),(GEOSITE,geolocation-cn)),分享
+  - AND,((DST-PORT,22/446/30443),(GEOIP,cn)),分享
+  - GEOIP,telegram,分享  
+  - GEOSITE,geolocation-!cn,分享
+  - GEOIP,!cn,分享
+  - MATCH,电报频道:@Whitelist520     #兜底规则
